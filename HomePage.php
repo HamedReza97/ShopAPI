@@ -1,4 +1,9 @@
 <?php
+
+include("API.php");
+include("panel-API.php");
+
+
 /**
  *
  * @param  WP_REST_Request $request Full details about the request.
@@ -15,14 +20,16 @@
  
  //#######################دسته بندی دلخواه#################################
 
+
+
 function wl_catagory($request) {
 	
 	$custom_catagorys = get_posts( array(
     'post_type' => 'product',
     'orderby'  => 'post_date',
     'order' => 'DESC',
-    
-    'posts_perPage' => -1,
+    'paged' => $request['page'],
+    'numberposts' => 15,
     'post_status' => 'publish',
     'tax_query' => array(
         array(
@@ -53,22 +60,24 @@ function wl_catagory($request) {
 	}
 	$data = $custom_catagory_product;
 	
-    if($data == []){
-	return new WP_REST_Response("No Product Found in This Catagory", 404);
-    }
-    else
-    {
-    return new WP_REST_Response($data, 200);
-    }
+        $arr = array();
+        $arr['code'] =$data == [] ? 404:200;
+        $arr['message'] = $data == [] ? "No Custom CatProduct Found":"ok";
+        $arr['error'] = false;
+        $response = array();
+        $response['responseCode'] = $arr;
+        $response['data'] = $data == [] ? null:$data; 
+        return new WP_REST_Response($response, $data == [] ? 404:200);
      
 }
 
- //#############################پیشنهاد ویژه##########################
+//############################# PRODUCT bY id ##########################
 
-	function wl_specialoffer($request){
+	function wl_ProductByID($request){
     $args = array(
     'post_type' => 'product',
-    'posts_perPage' => -1
+    'posts_per_page' => -1,
+    'ID' => $request['id']
     );
         $i=0;                
 	    $posts = get_posts($args);
@@ -96,6 +105,7 @@ function wl_catagory($request) {
         $hours = floor(($difference - $days * 86400) / 3600);
         $minutes = floor(($difference - $days * 86400 - $hours * 3600) / 60);
         $seconds = floor($difference - $days * 86400 - $hours * 3600 - $minutes * 60);
+        $special_offer[$i]['urlFirst'] = "https://www.onlineshoo.com/wp-content/plugins/woocommerce-offer-nikan/assets/images/slider-banner.png";
         $special_offer[$i]['timeRemaining'] = "$days:$hours:$minutes:$seconds";
         $special_offer[$i]['timeRemainingTimeStamp'] = "$time_remaining";
         if ($time_remaining <= 0){
@@ -110,14 +120,76 @@ function wl_catagory($request) {
         $i++;
         }
 	    }
-    if($special_offer == []){
-	return new WP_REST_Response("No Prodcut was Found!", 404);
-    }
-    else
-    {
+        
+        $arr = array();
+        $arr['code'] =$data == [] ? 404:200;
+        $arr['message'] = $data == [] ? "No Special Offer Found":"ok";
+        $arr['error'] = false;
+        $response = array();
+        $response['responseCode'] = $arr;
+        $response['data'] = $data == [] ? null:$data; 
+        return new WP_REST_Response($response, $data == [] ? 404:200);
+        
+        return array('order' => apply_filters('woocommerce_api_order_response', $data, $posts, $fields));
+	}
+ //#############################پیشنهاد ویژه##########################
 
-        return new WP_REST_Response($data, 200);
-    }
+	function wl_specialoffer($request){
+    $args = array(
+    'post_type' => 'product',
+    'posts_per_page' => -1
+    );
+        $i=0;                
+	    $posts = get_posts($args);
+	    foreach ($posts as $post){
+		$special_offer[$i]['id'] = $post->ID;
+		$special_offer[$i]['title'] = $post->post_title;
+        $special_offer[$i]['regularPrice'] = $post->_regular_price;
+        $special_offer[$i]['salePrice'] = $post->_sale_price; 
+        if($post->_sale_price){
+        $special_offer[$i]['salePrecent'] = (int)round((($post->_regular_price - $post->_sale_price) / $post->_regular_price) *100);
+        }
+       $special_offer[$i]['featuredImage']['thumbnail'] = get_the_post_thumbnail_url($post->ID, 'thumbnail');
+		$special_offer[$i]['featuredImage']['medium'] = get_the_post_thumbnail_url($post->ID, 'medium');
+		$special_offer[$i]['featuredImage']['large'] = get_the_post_thumbnail_url($post->ID, 'large');
+		$special_offer[$i]['stock'] = $post->_stock;
+		$special_offer[$i]['averageRating'] = $post->_wc_average_rating;
+		$special_offer[$i]['totalSales'] = $post->total_sales;
+		$format = 'F d, Y H:i';
+        $timestamp = $post->offer_to_date;
+        $special_offer[$i]['offerToDate'] = $gmt = date_i18n($format, $timestamp);
+        $current_time = current_datetime();
+        $time_remaining = $post->offer_to_date - $current_time->getTimestamp();
+        $difference = abs($time_remaining);
+        $days = floor($difference / 86400);
+        $hours = floor(($difference - $days * 86400) / 3600);
+        $minutes = floor(($difference - $days * 86400 - $hours * 3600) / 60);
+        $seconds = floor($difference - $days * 86400 - $hours * 3600 - $minutes * 60);
+        $special_offer[$i]['urlFirst'] = "https://www.onlineshoo.com/wp-content/plugins/woocommerce-offer-nikan/assets/images/slider-banner.png";
+        $special_offer[$i]['timeRemaining'] = "$days:$hours:$minutes:$seconds";
+        $special_offer[$i]['timeRemainingTimeStamp'] = "$time_remaining";
+        if ($time_remaining <= 0){
+        unset($special_offer[$i]);    
+        }
+		$i++;
+	    }
+	    if ($special_offer){
+	    $i=0;
+        foreach ($special_offer as $special){
+        $data[$i] = $special;
+        $i++;
+        }
+	    }
+        
+        $arr = array();
+        $arr['code'] =$data == [] ? 404:200;
+        $arr['message'] = $data == [] ? "No Special Offer Found":"ok";
+        $arr['error'] = false;
+        $response = array();
+        $response['responseCode'] = $arr;
+        $response['data'] = $data == [] ? null:$data; 
+        return new WP_REST_Response($response, $data == [] ? 404:200);
+        
         return array('order' => apply_filters('woocommerce_api_order_response', $data, $posts, $fields));
 	}
 
@@ -129,7 +201,7 @@ function wl_catagory($request) {
 	'post_type' => array('attachment'),
 	'post_parent' => 5776,
 	'post_status' => array('inherit', 'publish'),
-	'posts_perPage' => -1,
+	'posts_per_page' => -1,
 );
     $attachments = get_posts($args);
     $i = 0;
@@ -142,31 +214,35 @@ function wl_catagory($request) {
     $i++;
     }
     
-    if($banner == []){
-    return new WP_REST_Response("No Slider was Found!", 404);
-    }
-    else
-    {
-    return new WP_REST_Response($banner, 200);
-    }
+    $data = $banner;
+            $arr = array();
+        $arr['code'] =$data == [] ? 404:200;
+        $arr['message'] = $data == [] ? "No Banner Found":"ok";
+        $arr['error'] = false;
+        $response = array();
+        $response['responseCode'] = $arr;
+        $response['data'] = $data == [] ? null:$data; 
+        return new WP_REST_Response($response, $data == [] ? 404:200);
+        
         return array('order' => apply_filters('woocommerce_api_order_response', $banner, $order, $fields));
 }
 
  //######################محصولات پربازدید##########################
 
 	function wl_popular($request){
+	   
     $args = array(
         'post_type' => 'product',
         'orderby'  => 'meta_value_num',
         'order' => 'DESC',
         'meta_key' => 'pageview',
-        'posts_perPage' => 4,
+        'numberposts' => 12,
         'paged' => $request['page'],
     );
     $posts = get_posts($args);
     $count = wp_count_posts($type = 'product');
     $i=0;                    
-	 $posts = get_posts($args);
+	$posts = get_posts($args);
     foreach($posts as $post) {
 		$popular_products[$i]['id'] = $post->ID;
 		$popular_products[$i]['title'] = $post->post_title;
@@ -186,32 +262,37 @@ function wl_catagory($request) {
 	}
     $data=new \stdClass();
     $data->total=intval($count->publish);
-    $data->perPage=4;
+    $data->perPage=$i;
     $data->currentPage=(int)$request['page'];
     $data->lastPage=ceil(intval($count->publish)/$data->perPage);
     $data->from=($data->currentPage-1)*$data->perPage+1;
     $data->to=$data->from+$data->perPage;
     $data->data=$popular_products;
-    if($popular_products == []){
-    return new WP_REST_Response("No Product was Found!", 404);
-    }
-    else
-    {
-    return new WP_REST_Response($data, 200);
-    }
+
+        $arr = array();
+        $arr['code'] =$data == [] ? 404:200;
+        $arr['message'] = $data == [] ? "No PopularProduct Found":"ok";
+        $arr['error'] = false;
+        $response = array();
+        $response['responseCode'] = $arr;
+        $response['data'] = $data == [] ? null:$data; 
+        return new WP_REST_Response($response, $data == [] ? 404:200);
+        
+
         return array('order' => apply_filters('woocommerce_api_order_response', $data, $order, $fields));
 }
 
  //#################محصولات پرفروش###############################
 
     function wl_mostsold($request){
+     
      $args = array(
         'post_type' => 'product',
         'orderby'  => 'meta_value_num',
         'order' => 'DESC',
         'meta_key' => 'total_sales',
         'paged' => $request['page'],
-        'posts_perPage' => 4
+        'numberposts' => 3
     );
     $i=0;                    
     $count = wp_count_posts($type = 'product');
@@ -234,19 +315,23 @@ function wl_catagory($request) {
 	}
 	$data=new \stdClass();
     $data->total=intval($count->publish);
-    $data->perPage=4;
+    $data->perPage=3;
     $data->currentPage=(int)$request['page'];
     $data->lastPage=ceil(intval($count->publish)/$data->perPage);
     $data->from=($data->currentPage-1)*$data->perPage+1;
     $data->to=$data->from+$data->perPage;
     $data->data=$most_sold;
-	if($most_sold == []){
-    return new WP_REST_Response("No Product was Found!", 404);
-    }
-    else
-    {
-    return new WP_REST_Response($data, 200);
-    }
+
+        $arr = array();
+        $arr['code'] =$data == [] ? 404:200;
+        $arr['message'] = $data == [] ? "No MostSold Found":"ok";
+        $arr['error'] = false;
+        $response = array();
+        $response['responseCode'] = $arr;
+        $response['data'] = $data == [] ? null:$data; 
+        return new WP_REST_Response($response, $data == [] ? 404:200);
+        
+
         return array('order' => apply_filters('woocommerce_api_order_response', $data, $order, $fields));
         
     }
@@ -258,7 +343,7 @@ function wl_catagory($request) {
         'post_type' => 'intro_slider',
         'orderby'  => 'post_date',
         'order' => 'ASC',
-        'posts_perPage' => -1,
+        'posts_per_page' => -1,
     );
     
     $intros = get_posts($args);
@@ -272,13 +357,17 @@ function wl_catagory($request) {
         $i++;
     }
     
-    if($intro_slider == []){
-    return new WP_REST_Response("No Intro Slider was Found!", 404);
-    }
-    else
-    {
-    return new WP_REST_Response($intro_slider, 200);
-    }
+        $data = $intro_slider;
+        $arr = array();
+        $arr['code'] =$data == [] ? 404:200;
+        $arr['message'] = $data == [] ? "No IntroSlider Found":"ok";
+        $arr['error'] = false;
+        $response = array();
+        $response['responseCode'] = $arr;
+        $response['data'] = $data == [] ? null:$data; 
+        return new WP_REST_Response($response, $data == [] ? 404:200);
+        
+
         return array('order' => apply_filters('woocommerce_api_order_response', $intro_slider, $order, $fields));
     }
     
@@ -286,7 +375,10 @@ function wl_catagory($request) {
     
     function wl_homecatagory(){
         
-    $terms = get_terms(array('taxonomy'=>'product_cat','parent'=>0));
+    $terms = get_terms(array('taxonomy'=>'product_cat','parent'=>0 , 
+        'orderby'  => 'count',
+    'order' => 'DESC',
+    ));
     $term_data =[];
     $i = 0;
     foreach ($terms as $term){
@@ -295,16 +387,26 @@ function wl_catagory($request) {
     $term_data[$i]['catagory'] = $term->name;
     $image_id = get_term_meta($term->term_id, 'thumbnail_id', true );
     $term_data[$i]['icon'] = $post_thumbnail_img = wp_get_attachment_image_src( $image_id, 'large' );
+    $images = get_term_meta($term->term_id, 'image_id', true );
+    $post_thumbnail_img = get_term_meta($term->term_id, 'image_id', true );
+    if($post_thumbnail_img == false)
+        $term_data[$i]['image'] =null; 
+    else
+        $term_data[$i]['image'] = $post_thumbnail_img;
+    
     $i++;
     }
-    
-    if($term_data == []){
-    return new WP_REST_Response("No Catagory was Found!", 404);
-    }
-    else
-    {
-    return new WP_REST_Response($term_data, 200);
-    }
+        $data = $term_data;
+        $arr = array();
+        $arr['code'] =$data == [] ? 404:200;
+        $arr['message'] = $data == [] ? "No IntroSlider Found":"ok";
+        $arr['error'] = false;
+        $response = array();
+        $response['responseCode'] = $arr;
+        $response['data'] = $data == [] ? null:$data; 
+        return new WP_REST_Response($response, $data == [] ? 404:200);
+        
+
         return array('order' => apply_filters('woocommerce_api_order_response', $term_data, $order, $fields));
     }
 
@@ -316,7 +418,7 @@ function wl_catagory($request) {
 	    'post_type' => array('page_slider'),
 	    'post_parent' => 5776,
 	    'post_status' => array('inherit', 'publish'),
-	    'posts_perPage' => -1,
+	    'numberposts' => -1
     );
     
     $sliders = get_posts($args);
@@ -331,13 +433,18 @@ function wl_catagory($request) {
         $i++;
     }
      
-    if($slider_data == []){
-    return new WP_REST_Response("No Slider was Found!", 404);
-    }
-    else
-    {
-    return new WP_REST_Response($slider_data, 200);
-    }
+        $data = $slider_data;
+        $arr = array();
+        $arr['code'] =$data == [] ? 404:200;
+        $arr['message'] = $data == [] ? "No IntroSlider Found":"ok";
+        $arr['error'] = false;
+        $response = array();
+        $response['responseCode'] = $arr;
+        $response['data'] = $data == [] ? null:$data; 
+        return new WP_REST_Response($response, $data == [] ? 404:200);
+        
+
+
         return array('order' => apply_filters('woocommerce_api_order_response', $slider_data, $order, $fields));
     }
     
@@ -348,7 +455,7 @@ function wl_catagory($request) {
     'orderby'  => 'post_date',
     'order' => 'DESC',
     
-    'posts_perPage' => -1,
+    'posts_per_page' => -1,
     'post_status' => 'publish',
     'tax_query' => array(
         array(
@@ -376,13 +483,19 @@ function wl_catagory($request) {
 		$Major[$i]['totalSales'] = $post->total_sales;
 		$i++;
 	}
-	if($Major == []){
-    return new WP_REST_Response("No Product was Found!", 404);
-    }
-    else
-    {
-    return new WP_REST_Response($Major, 200);
-    }
+
+     
+        $data = $Major;
+        $arr = array();
+        $arr['code'] =$data == [] ? 404:200;
+        $arr['message'] = $data == [] ? "No IntroSlider Found":"ok";
+        $arr['error'] = false;
+        $response = array();
+        $response['responseCode'] = $arr;
+        $response['data'] = $data == [] ? null:$data; 
+        return new WP_REST_Response($response, $data == [] ? 404:200);
+        
+
         return array('order' => apply_filters('woocommerce_api_order_response', $Major, $order, $fields));
 	}
 	
@@ -401,7 +514,7 @@ function wl_catagory($request) {
     'post_type' => 'product',
     'orderby'  => 'post_date',
     'order' => 'DESC',
-    'posts_perPage' => -1,
+    'numberposts' => -1
     ));
     $i=0;
     foreach($posts as $post) {
@@ -422,17 +535,28 @@ function wl_catagory($request) {
 	}
     }
     if($user_id == 0){
-    return new WP_REST_Response("User not loged in or not Found!", 404);
+          $arr = array();
+        $arr['code'] =403;
+        $arr['message'] = "User not loged in or not Found";
+        $arr['error'] = false;
+        $response = array();
+        $response['responseCode'] = $arr;
+        $response['data'] = null;
+ 
+        return new WP_REST_Response($response, 403);
     }
     else
     {
-	if($wishlist_data == []){
-    return new WP_REST_Response("No Product was Found!", 404);
-    }
-    else
-    {
-    return new WP_REST_Response($wishlist_data, 200);
-    }
+        $data = $Major;
+        $arr = array();
+        $arr['code'] =$data == [] ? 404:200;
+        $arr['message'] = $data == [] ? "No IntroSlider Found":"ok";
+        $arr['error'] = false;
+        $response = array();
+        $response['responseCode'] = $arr;
+        $response['data'] = $data == [] ? null:$data; 
+        return new WP_REST_Response($response, $data == [] ? 404:200);
+        
     }
         return array('order' => apply_filters('woocommerce_api_order_response', $wishlist_data, $order, $fields));
 	}
