@@ -1,7 +1,8 @@
 <?php
-include_once WP_PLUGIN_DIR. 'WooCommerce-Parsian-Gateway/woocommerce-parsian.php';
+include_once WP_PLUGIN_DIR. '/parsian-woocommerce-ipg/parsian-woocommerce-ipg.php';
 
 function wl_payment($request){
+    
     $current_user = wp_get_current_user();
     $user_id = $current_user->ID;
 if ( null === WC()->session ) {
@@ -24,7 +25,15 @@ if ( null === WC()->session ) {
     $result = $available_gateways[ $request['gatewayId'] ]->process_payment( $order->id );
     if ( $result['result'] == 'success' ) {
         $result = apply_filters( 'woocommerce_payment_successful_result', $result, $order->id );
-        wp_redirect( $result['redirect'] );
+        
+        $arr['code'] = 200;
+        $arr['message'] =  "ok";
+        $arr['error'] = false;
+        $arr['data'] = $order->id;
+        $response = array();
+        $response['data'] = $result['redirect'] ;
+        $response['responseCode'] = $arr;
+        return new WP_REST_Response($response, 200);
         exit;
     }
     $arr['code'] = 200;

@@ -1,12 +1,47 @@
 <?php
+    function wl_SortintItem(){
+        $response = array();
+        $response[0]['Title'] = "پیشفرض";
+        $response[0]['Tag'] = "default";
+        
+        $response[1]['Title'] = "بیشترین فروش";
+        $response[1]['Tag'] = "sell";
+        
+        $response[2]['Title'] = " قیمت صعودی";
+        $response[2]['Tag'] = "priceTop";
+        
+        $response[3]['Title'] = "قیمت نزولی";
+        $response[3]['Tag'] = "priceDown";
+        
+        $response[4]['Title'] = "جدیدترین";
+        $response[4]['Tag'] = "new";
+        
+        $response[5]['Title'] = "قدیمی ترین";
+        $response[5]['Tag'] = "old";
+        
+        return new WP_REST_Response($response, 200);
+    }
+    
+    function wl_Colors(){
+        $response = array();
+        $response[0]['Title'] = "قرمز شگفت انگیز";
+        $response[0]['Colors'] = ['#F25F70','#FF5959','#EF394E','#EF394E','#EF394E'];
+        
+        $response[1]['Title'] = "آبی";
+        $response[1]['Colors'] = ['#0FB3D1','#2742FF'];
+        
+        
+        
+        return new WP_REST_Response($response, 200);
+    }
+    
     function wl_boxes(){
         $args = array(
         'force_no_custom_order' => true,
 	    'post_type' => array('PiAppHomeProductBox'),
-	    'post_parent' => 0,
 	    'post_status' => array('publish'),
 	    'posts_perPage' => -1,
-	    'orderby'  => 'comment_count',
+	    'orderby'  => 'post_parent',
         'order' => 'ASC',
     );
     
@@ -17,13 +52,13 @@
         
         $slider_data[$i]['ID'] = $slider->ID;
         $slider_data[$i]['Title'] = $slider->post_title;
-        $slider_data[$i]['Position'] = $slider->comment_count;
-        $slider_data[$i]['More'] = $slider->post_excerpt;
+        $slider_data[$i]['Position'] = $slider->post_parent;
+        $slider_data[$i]['More'] = $slider->comment_count;
         $slider_data[$i]['Time'] = $slider->post_content;
         $slider_data[$i]['ColorJson'] = $slider->post_mime_type;
         $slider_data[$i]['API'] = $slider->post_content_filtered;
-        $slider_data[$i]['Type'] = $slider->post_name;
-        $slider_data[$i]['CatId'] = $slider->guid;
+        $slider_data[$i]['Type'] = explode("-",$slider->post_name)[0];
+        $slider_data[$i]['CatId'] = $slider->menu_order;
         $i++;
     }
         $arr = array();
@@ -168,15 +203,77 @@ function wl_categoryHomeProduct($request) {
      
 }
 
+function wl_DefaultProduct($request) {
+	
+	$custom_catagorys = get_posts( array(
+    'post_type' => 'product',
+
+    'posts_per_page' => -1,
+    'post_status' => 'publish',
+    'tax_query' => array(
+        array(
+        'taxonomy' => 'product_cat',
+        'field'    => 'term_id',
+        'terms'     =>  [$request['id']],
+        'operator'  => 'IN'
+            )
+        ),
+    ));
+    $i=0;
+    foreach($custom_catagorys as $custom_catagory) {
+		$custom_catagory_product[$i]['id'] = $custom_catagory->ID;
+		$custom_catagory_product[$i]['title'] = $custom_catagory->post_title;
+        $custom_catagory_product[$i]['regularPrice'] = $custom_catagory->_regular_price;
+        $custom_catagory_product[$i]['salePrice'] = $custom_catagory->_sale_price; 
+        if($post->_sale_price){
+        $custom_catagory_product[$i]['salePrecent'] = (int)round((($custom_catagory->_regular_price - $custom_catagory->_sale_price) / $custom_catagory->_regular_price) *100);
+        }
+        $custom_catagory_product[$i]['featuredImage']['thumbnail'] = get_the_post_thumbnail_url($custom_catagory->ID, 'thumbnail');
+		$custom_catagory_product[$i]['featuredImage']['medium'] = get_the_post_thumbnail_url($custom_catagory->ID, 'medium');
+		$custom_catagory_product[$i]['featuredImage']['large'] = get_the_post_thumbnail_url($custom_catagory->ID, 'large');
+			$format = 'F d, Y H:i';
+        $timestamp = $post->offer_to_date;
+        $custom_catagory_product[$i]['offerToDate'] = $gmt = date_i18n($format, $timestamp);
+        $current_time = current_datetime();
+        $time_remaining = $post->offer_to_date - $current_time->getTimestamp();
+        $difference = abs($time_remaining);
+        $days = floor($difference / 86400);
+        $hours = floor(($difference - $days * 86400) / 3600);
+        $minutes = floor(($difference - $days * 86400 - $hours * 3600) / 60);
+        $seconds = floor($difference - $days * 86400 - $hours * 3600 - $minutes * 60);
+
+// 		$custom_catagory_product[$i]['timeRemaining'] = "$days:$hours:$minutes:$seconds";
+//         $custom_catagory_product[$i]['timeRemainingTimeStamp'] = "$time_remaining";
+		$custom_catagory_product[$i]['timeRemaining'] = "0";
+        $custom_catagory_product[$i]['timeRemainingTimeStamp'] = "0";
+		$custom_catagory_product[$i]['stock'] = $custom_catagory->_stock;
+		$custom_catagory_product[$i]['averageRating'] = $custom_catagory->_wc_average_rating;
+		$custom_catagory_product[$i]['totalSales'] = $custom_catagory->total_sales;
+		
+		$i++;
+	}
+	$data = $custom_catagory_product;
+	
+        $arr = array();
+        $arr['code'] =$data == [] ? 404:200;
+        $arr['message'] = $data == [] ? "No Custom CatProduct Found":"ok";
+        $arr['error'] = false;
+        $response = array();
+        $response['responseCode'] = $arr;
+        $response['data'] = $data == [] ? null:$data; 
+        return new WP_REST_Response($response, $data == [] ? 404:200);
+     
+}
         
 
 	function wlReviewCount($request){	
 	    if ($request['page'] == ""){
 	        $request['page'] = 1;
 	    }
-	    $comment_args = [
+	     $comment_args = [
 	    'post_id' => $request['id'],
-	    'type' => 'review'
+	    'type' => 'review',
+	    'status' => 'approve'
 	    ];
 
 	    $comments = get_comments($comment_args);
@@ -340,7 +437,7 @@ function wl_categoryHomeProduct($request) {
         }
         else 
         {
-        $output = $outputs;
+        $output = $ouitputs;
         }
         $data=new \stdClass();
         $data->total=count($count);
@@ -378,9 +475,15 @@ function wl_categoryHomeProduct($request) {
     $banner[$i]['postName'] = $attachment->post_name;
     $banner[$i]['call'] = $attachment->post_content_filtered;
     $banner[$i]['postContent'] = $attachment->post_content;
-    $banner[$i]['intent'] = "none";
+    $intent = $attachment->post_name;
+    if(empty($intent)){
+        $banner[$i]['intent'] = "none";
+    }else{
+        $intent = $attachment->post_name; 
+    }
+    $banner[$i]['intent'] = $intent;
     $banner[$i]['type'] = $attachment->post_mime_type;
-    $banner[$i]['position'] = $attachment->post_excerpt ;
+    $banner[$i]['position'] = $attachment->post_excerpt;
     $banner[$i]['link'] = $attachment->guid;
     $i++;
     }
@@ -411,8 +514,19 @@ function wl_categoryHomeProduct($request) {
     $banner[$i]['id'] = $attachment->ID;
     $banner[$i]['postName'] = $attachment->post_name;
     $banner[$i]['call'] = $attachment->post_content_filtered;
-    $banner[$i]['postContent'] = $attachment->post_content;
-    $banner[$i]['intent'] = $attachment->post_mime_type."&".$attachment->post_excerpt . "\n" . "none";
+    $brand = $attachment->post_content;
+    if(empty($attachment->post_content) || $attachment->post_content == null){
+        $brand = "null";
+    }
+    $banner[$i]['postContent'] = $brand."/".$attachment->menu_order;
+    $intent = $attachment->post_name;
+    if(empty($intent)){
+        $intent = "none";
+    }else{
+        $intent = $attachment->post_name; 
+    }
+    $banner[$i]['intent'] = $attachment->post_mime_type."&".$attachment->post_excerpt . "\n" . $intent;
+    
     $banner[$i]['link'] = $attachment->guid;
     $i++;
     }
@@ -613,8 +727,20 @@ add_action('rest_api_init', function() {
 	    	register_rest_route('wl/v1', '/catagoryHome', [
 	    'methods'  => WP_REST_Server::READABLE,
 	    'callback' =>'wl_categoryHomeProduct',
+	    ]);  	
+	    	register_rest_route('wl/v1', '/catagoryHomeProduct', [
+	    'methods'  => WP_REST_Server::READABLE,
+	    'callback' =>'wl_categoryHomeProduct',
+	    ]);  	   
+	    	register_rest_route('wl/v1', '/defaultProduct', [
+	    'methods'  => WP_REST_Server::READABLE,
+	    'callback' =>'wl_DefaultProduct',
 	    ]);  	   
 	    register_rest_route('wl/v1', '/catagoryHomeOrderByDate', [
+	    'methods'  => WP_REST_Server::READABLE,
+	    'callback' =>'wl_catagoryHomeOrderByDate',
+	    ]);  
+	    register_rest_route('wl/v1', '/catagoryHomeOrderByDateProduct', [
 	    'methods'  => WP_REST_Server::READABLE,
 	    'callback' =>'wl_catagoryHomeOrderByDate',
 	    ]);  
@@ -641,6 +767,15 @@ add_action('rest_api_init', function() {
         register_rest_route('wl/v1', '/brands', [
 	    'methods'  => WP_REST_Server::READABLE,
 	    'callback' =>'wlGiveBrand',
+	    ]); 
+	    
+        register_rest_route('wl/v1', '/sortingItem', [
+	    'methods'  => WP_REST_Server::READABLE,
+	    'callback' =>'wl_SortintItem',
+	    ]); 
+        register_rest_route('wl/v1', '/color', [
+	    'methods'  => WP_REST_Server::READABLE,
+	    'callback' =>'wl_Colors',
 	    ]); 
 });
     

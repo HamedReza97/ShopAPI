@@ -2,6 +2,7 @@
 
 include("API.php");
 include("panel-API.php");
+include("piepa_panel_api/api.php");
 
 
 /**
@@ -610,5 +611,10 @@ add_action('rest_api_init', function() {
 	    'methods'  => WP_REST_Server::READABLE,
 	    'callback' =>'wl_wishlist',
 	    ]);     
+	    
+	register_rest_route('wl/v1', '/addLayout', [
+		'methods' => array('POST'),
+		'callback' => 'wl_addLayout',
+	]);   
 });
     

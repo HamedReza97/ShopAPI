@@ -178,7 +178,7 @@ function wl_createOrder($request){
     $quantity = (int)$values['quantity'];
     $done = $order->add_product($product, $quantity);
     }
-    if(!WC()->customer->get_shipping()){
+    // if(!WC()->customer->get_shipping()){
     if($item_data->address){
     $address['first_name'] = $item_data->address->firstName;
     $address['last_name'] = $item_data->address->lastName;
@@ -214,12 +214,12 @@ function wl_createOrder($request){
     }
     $order->set_address( $address, 'billing' );
     $order->set_address( $address, 'shipping' );
-    }
-    else
-    {
-    $order->set_address( WC()->customer->get_billing(), 'billing' );
-    $order->set_address( WC()->customer->get_shipping(), 'shipping' );    
-    }
+    // }
+    // else
+    // {
+    // $order->set_address( WC()->customer->get_billing(), 'billing' );
+    // $order->set_address( WC()->customer->get_shipping(), 'shipping' );    
+    // }
     $cart_hash = md5(json_encode(wc_clean(WC()->cart->get_cart_for_session())) . WC()->cart->total);
     $order->set_created_via('checkout');
     $order->set_cart_hash($cart_hash);
@@ -259,6 +259,24 @@ function wl_createOrder($request){
     WC()->cart->empty_cart();
   }
   if ($done == true){
+     if ($user_id == $order->customer_id ){ 
+    WC()->session->order_awaiting_payment = $order->id;
+    $available_gateways = WC()->payment_gateways->get_available_payment_gateways();
+    $result = $available_gateways[ $item_data->paymentMethod]->process_payment( $order->id );
+    if ( $result['result'] == 'success' ) {
+        $result = apply_filters( 'woocommerce_payment_successful_result', $result, $order->id );
+          $arr['code'] = 200;
+    $arr['message'] =  "ok";
+    $arr['error'] = false;
+    $arr['data'] = $order_id;
+    $response = array();
+    $response['data'] = $result['redirect'] ;
+    $response['responseCode'] = $arr;
+    return new WP_REST_Response($response, 200);
+       
+        exit;
+    }
+          }
   $arr['code'] = 200;
     $arr['message'] =  "ok";
     $arr['error'] = false;
@@ -275,7 +293,7 @@ function wl_createOrder($request){
     $arr['error'] = true;
     $response = array();
     $response['responseCode'] = $arr;
-    return new WP_REST_Response($response, 404); 
+    return new WP_REST_Response($response, 200); 
   }
 }
 }
@@ -411,6 +429,7 @@ function wl_getShipping ($request){
     $user_id = $current_user->ID == 0 ?null:$current_user->ID;
     $item_data = json_decode($request->get_body());  
     if($user_id == 0 or $user_id == null){
+    return $user_id;
     $arr['code'] = 403;
     $arr['message'] = "forbidden";
     $arr['error'] = true;
@@ -432,6 +451,7 @@ function wl_getShipping ($request){
     if ( null === WC()->cart ) {
     WC()->cart = new WC_Cart();
     }
+    
     if($item_data->address){
     $address['first_name'] = $item_data->address->firstName;
     $address['last_name'] = $item_data->address->lastName;
@@ -464,6 +484,8 @@ function wl_getShipping ($request){
     $address['email'] = get_user_meta( $current_user->ID, 'billing_email', true ) == "" ? null:get_user_meta( $current_user->ID, 'billing_email', true );  
     }
 
+    WC()->customer->set_shipping_state($address['state']);
+    WC()->customer->set_shipping_city($address['city']);
     $bh_packages =  WC()->cart->get_shipping_packages();
     $bh_packages[0]['destination']['state'] = $address['state'];
     $bh_packages[0]['destination']['postcode'] = $address['postcode'];
@@ -477,12 +499,14 @@ function wl_getShipping ($request){
     foreach( $bh_packages as $bh_package_key => $bh_package ) {
         $bh_shipping_methods[$bh_package_key] = WC()->shipping->calculate_shipping_for_package($bh_package, $bh_package_key);
     }
-    $shippingArr = $bh_shipping_methods[0]['rates'];
+    
+    // return WC()->cart->get_shipping_packages();
+     $shippingArr = $bh_shipping_methods[0]['rates'];
     if(!empty($shippingArr)) {
         $responses = array();
         foreach ($shippingArr as $value) {
             if ($value->cost == 0){
-            if($address['state'] == "THR" && $address['city'] = "تهران"){
+            if($address['state'] == "THR" && $address['city'] == "تهران"){
             $shipping['id'] = $value->id;
             $shipping['methodId'] = $value->method_id;
             $shipping['label'] = $value->label;
@@ -499,6 +523,7 @@ function wl_getShipping ($request){
             $responses['shipping'][] = $shipping;    
             }
     }
+    
     $arr['code'] = 200;
     $arr['message'] =  "ok";
     $arr['error'] = false;
@@ -548,9 +573,9 @@ function wl_paymentMethod($request){
     if ( null === WC()->cart ) {
     WC()->cart = new WC_Cart();
     }
-    $order = wc_get_order($request['orderId']);
-    if ($user_id == $order->customer_id ){ 
-    WC()->session->order_awaiting_payment = $order->id;
+    // $order = wc_get_order($request['orderId']);
+    if ($user_id != null){ 
+    // WC()->session->order_awaiting_payment = $order->id;
     $available_gateways = WC()->payment_gateways->get_available_payment_gateways();
     $i=0;
     foreach ($available_gateways as $getway){
