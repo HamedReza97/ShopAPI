@@ -17,6 +17,7 @@ function wl_cart($request){
     WC()->session->init();
     WC()->session->set( 'wc_notices', null );
     }
+    
 
     if ( null === WC()->customer ) {
     WC()->customer = new WC_Customer( $user_id, true );
